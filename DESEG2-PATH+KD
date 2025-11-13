@@ -1,0 +1,200 @@
+library("DESeq2")
+setwd("~/CE_Data/CEdata/190921-CETranscriptomeRH")
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+countData <- as.matrix(read.csv("gene_count_matrix.csv", row.names="gene_id"))
+head(countData)
+colnames(countData)[1]<-"1A"
+head(countData)
+colnames(countData)[2]<-"1B"
+colnames(countData)[3]<-"1c"
+colnames(countData)[4]<-"1D"
+colnames(countData)[5]<-"2A"
+colnames(countData)[6]<-"2B"
+colnames(countData)[7]<-"2C"
+colnames(countData)[8]<-"2D"
+colnames(countData)[9]<-"3A"
+colnames(countData)[10]<-"3B"
+colnames(countData)[11]<-"3C"
+colnames(countData)[12]<-"3D"
+colnames(countData)[13]<-"4A"
+colnames(countData)[14]<-"4B"
+colnames(countData)[15]<-"4C"
+colnames(countData)[16]<-"4D"
+head(countData)
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+colData <- read.csv("191004-Metadata.csv", sep=",", row.names=1)
+head(colData)
+all(rownames(colData) %in% colnames(countData))
+colData
+head(countData)
+colnames(countData)[3]<-"1C"
+all(rownames(colData) %in% colnames(countData))
+countData <- countData[, rownames(colData)]
+all(rownames(colData) == colnames(countData))
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+save.image("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-Workspace.RData")
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~ Pathogen + KD)
+dds <- DESeq(dds)
+res <- results(dds)
+(resOrdered <- res[order(res$padj), ])
+save.image("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-Workspace.RData")
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+write.table(resOrdered, "./200731-ResOrdered.txt", sep="\t")
+setwd("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD")
+library("pheatmap")
+select <- order(rowMeans(counts(dds,normalized=TRUE)), decreasing=TRUE)[1:20]
+resultsNames(dds)
+resLFC <- lfcShrink(dds, coef="KD_EF_vs_bir2", type="apeglm")
+resLFC
+plotMA(resLFC, ylim=c(-2,2))
+sum(res$padj < 0.05, na.rm=TRUE)
+res05 <- results(dds, alpha=0.05)
+summary(res05)
+df <- as.data.frame(colData(dds)[,c("KD","Pathogen")])
+vsdata <- vst(dds, blind=FALSE)
+plotPCA(vsdata, intgroup="KD")
+hist(res$pvalue[res$baseMean > 1], breaks = 0:20/20,
++      col = "grey50", border = "white")
+hist(res$pvalue[res$baseMean > 1], breaks = 0:20/20,col = "red", border = "white")
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+save.image("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-Workspace.RData")
+library(reshape2)
+install.packages("reshape2")
+library(RColorBrewer)
+library(viridis)
+library(viridisLite)
+upgenes <- rownames(head(resOrdered, n=20))
+downgenes <- rownames(tail(resOrdered, n=20))
+rld<-rlog(dds, blind=F)
+rows<-match(upgenes, row.names(rld))
+distsRL <- dist(t(assay(rld)))
+mat <- as.matrix(distsRL)
+rownames(mat) <- colnames(mat) <- with(colData(dds), paste(KD))
+colnames(mat) = NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(mat,clustering_distance_rows=distsRL,clustering_distance_cols=distsRL,col=colors)
+par( mfrow = c( 1, 2 ) )
+plot(log2( 1 + counts(dds)[ , 1:2] ),pch=16, cex=0.3, main = "log2")
+plot(assay(rld)[ , 1:2],pch=16, cex=0.3, main = "rlog")
+head(resLFC[ order(resLFC$log2FoldChange, decreasing=TRUE), ], 10)
+head(resOrdered[ order(resOrdered$log2FoldChange, decreasing=TRUE), ], 10)
+TopFoldDown<-head(resOrdered[ order(resOrdered$log2FoldChange, decreasing=TRUE), ], 10)
+TopFoldUp<-head(resOrdered[order(resOrdered$log2FoldChange),],10)
+write.table(TopFoldDown,"./200731-TopFoldDownregulated",sep = "\t")
+write.table(TopFoldUp,"./200731-TopFoldUpregulated",sep = "\t")
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+save.image("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-Workspace.RData")
+library(EnhancedVolcano)
+EnhancedVolcano(res05, lab=rownames(res05), x='log2FOldChange',y = 'pvalue', selectLab = c('WBGene00007867|C32H11.4','WBGene00007875|dod-24'),xlim=c(-6,7),xlab=bquote(~Log[2]~ 'fold change'),pCutoff = 10e-14,FCcutoff = 2.0,pointSize = 4.0,labSize = 5.0,shape = c(4, 35, 17, 18),colAlpha = 1,legendPosition = 'right',legendLabSize = 14,legendIconSize = 5.0)
+res2<-results(dds,contrast = c('KD','pathogen'))
+res2<-results(dds,contrast = c('knockdown','KD','pathogen'))
+head(colData)
+res2<-results(dds,contrast = c('KD','OP50','bir2'))
+EnhancedVolcano(res2, lab=rownames(res2),x='log2FoldChange',y='pvalue',xlim = c(-5,8))
+EnhancedVolcano(res2,
+lab = rownames(res2),
+x = 'log2FoldChange',
+y = 'pvalue',
+selectLab = c('WBGene00007867|C32H11.4','WBGene00007875|dod-24'),
+xlim = c(-6,7),
+xlab = bquote(~Log[2]~ 'fold change'),
+pCutoff = 10e-14,
+FCcutoff = 2.0,
+pointSize = 4.0,
+labSize = 5.0,
+shape = c(4, 35, 17, 18),
+colAlpha = 1,
+legendPosition = 'right',
+legendLabSize = 14,
+legendIconSize = 5.0)
+EnhancedVolcano(res2,
+lab = rownames(res2),
+x = 'log2FoldChange',
+y = 'pvalue',
+selectLab = c('C32H11.4','dod-24'),
+xlim = c(-6,7),
+xlab = bquote(~Log[2]~ 'fold change'),
+pCutoff = 10e-14,
+FCcutoff = 2.0,
+pointSize = 4.0,
+labSize = 5.0,
+shape = c(4, 35, 17, 18),
+colAlpha = 1,
+legendPosition = 'right',
+legendLabSize = 14,
+legendIconSize = 5.0)
+Hit1<-c('WBGene00007867|C32H11.4')
+celltype1<-c('WBGene00007867|C32H11.4')
+p1 <- EnhancedVolcano(res2,
+lab = rownames(res2),
+x = 'log2FoldChange',
+y = 'pvalue',
+selectLab = Hit1,
+xlim = c(-6.5,6.5),
+xlab = bquote(~Log[2]~ 'fold change'),
+title = 'Shading cell-type 1',
+pCutoff = 10e-14,
+FCcutoff = 1.0,
+pointSize = 8.0,
+labSize = 5.0,
+labCol = 'purple',
+labFace = 'bold',
+boxedLabels = TRUE,
+shape = 42,
+colCustom = keyvals,
+colAlpha = 1,
+legendPosition = 'none',
+legendLabSize = 15,
+legendIconSize = 5.0,
+shade = celltype1,
+shadeLabel = 'Cell-type I',
+shadeAlpha = 1/2,
+shadeFill = 'purple',
+shadeSize = 4,
+shadeBins = 5,
+drawConnectors = TRUE,
+widthConnectors = 1.0,
+colConnectors = 'grey30',
+gridlines.major = TRUE,
+gridlines.minor = FALSE,
+border = 'partial',
+borderWidth = 1.5,
+borderColour = 'black')
+keyvals <- rep('#000000', nrow(res_A_W_lfc))
+p1 <- EnhancedVolcano(res2,
+lab = rownames(res2),
+x = 'log2FoldChange',
+y = 'pvalue',
+selectLab = Hit1,
+xlim = c(-6.5,6.5),
+xlab = bquote(~Log[2]~ 'fold change'),
+title = 'Shading cell-type 1',
+pCutoff = 10e-14,
+FCcutoff = 1.0,
+pointSize = 8.0,
+labSize = 5.0,
+labCol = 'purple',
+labFace = 'bold',
+boxedLabels = TRUE,
+shape = 42,
+colCustom = 'royalblue',
+colAlpha = 1,
+legendPosition = 'none',
+legendLabSize = 15,
+legendIconSize = 5.0,
+shade = celltype1,
+shadeLabel = 'Cell-type I',
+shadeAlpha = 1/2,
+shadeFill = 'purple',
+shadeSize = 4,
+shadeBins = 5,
+drawConnectors = TRUE,
+widthConnectors = 1.0,
+colConnectors = 'grey30',
+gridlines.major = TRUE,
+gridlines.minor = FALSE,
+border = 'partial',
+borderWidth = 1.5,
+borderColour = 'black')
+savehistory("~/CE_Data/CEdata/190921-CETranscriptomeRH/200731-Pathogen+KD/200731-History.Rhistory")
+
